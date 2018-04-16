@@ -5,6 +5,7 @@ import { Session } from "../services/public-interfaces";
 import { Configuration } from "./private-interfaces";
 import { CardResponse } from "./responses/card-response";
 import { ChatResponse } from "./responses/chat-response";
+import { DataResponse } from "./responses/data-response";
 import { SuggestionChipsResponse } from "./responses/suggestion-chips-response";
 
 /** Intent type - intents are either strings or type of GenericIntent */
@@ -41,6 +42,8 @@ export interface ResponseFactory {
 
   /** Creates a card response for adding simple graphical elements to your response */
   createCardResponse(): CardResponse;
+
+  createDataResponse(): DataResponse;
 }
 
 export interface Voiceable {
@@ -109,6 +112,7 @@ export interface EntitySet {
    * Allowed values of this entity set. Needs language id as hash key and a list
    * of string values or objects with string value and possible synonyms.
    */
+  // tslint:disable-next-line
   values: { [language: string]: Array<string | { value: string; synonyms: string[] }> };
 }
 
@@ -145,7 +149,7 @@ export interface EntityDictionary {
     name: string,
     validValues: string[]
   ):
-    | undefined
+    | undefined // tslint:disable-next-line
     | Array<{
         value: string;
         distance: number;
@@ -337,6 +341,10 @@ export namespace OptionalHandlerFeatures {
     reprompts: string[] | null;
   }
 
+  export interface DataMessage extends MinimalResponseHandler {
+    dataMessages: any[] | null;
+  }
+
   export namespace GUI {
     export namespace Card {
       /** If implemented, the response handler's platform supports simple cards, containing text title and body */
@@ -391,6 +399,8 @@ export namespace OptionalHandlerFeatures {
 
     /** Does this response handler support suggestion chips? */
     SuggestionChip: ["suggestionChips"],
+
+    DataMessage: ["dataMessages"],
   };
 }
 

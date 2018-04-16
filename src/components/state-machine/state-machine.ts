@@ -1,35 +1,36 @@
-import { injectable, inject } from "inversify";
+import { inject, injectable } from "inversify";
 import { Hooks } from "inversify-components";
-import { GenericIntent, intent } from "../unifier/public-interfaces";
-import { Session } from "../services/public-interfaces";
 import { Logger } from "../root/public-interfaces";
+import { Session } from "../services/public-interfaces";
+import { GenericIntent, intent } from "../unifier/public-interfaces";
 
-import { State, Transitionable } from "./public-interfaces";
 import { componentInterfaces } from "./private-interfaces";
+import { State, Transitionable } from "./public-interfaces";
 
 @injectable()
 export class StateMachine implements Transitionable {
-  intentHistory: { stateName: string; intentMethodName: string }[] = [];
-  
+  public intentHistory: Array<{ stateName: string; intentMethodName: string }> = [];
+
   constructor(
-    @inject("core:state-machine:current-state-provider") private getCurrentState: () => Promise<{instance: State.Required, name: string}>,
+    @inject("core:state-machine:current-state-provider") private getCurrentState: () => Promise<{ instance: State.Required; name: string }>,
     @inject("core:state-machine:state-names") private stateNames: string[],
     @inject("core:unifier:current-session-factory") private currentSessionFactory: () => Session,
     @inject("core:hook-pipe-factory") private pipeFactory: Hooks.PipeFactory,
     @inject("core:root:current-logger") private logger: Logger
-  ) { }
+  ) {}
 
-  async handleIntent(intent: intent, ...args: any[]) {
-    let currentState = await this.getCurrentState();
+  public async handleIntent(intent: intent, ...args: any[]) {
+    const currentState = await this.getCurrentState();
 
-    let intentMethod = this.deriveIntentMethod(intent);
-    this.intentHistory.push({stateName: currentState.name, intentMethodName: intentMethod});
+    const intentMethod = this.deriveIntentMethod(intent);
+    this.intentHistory.push({ stateName: currentState.name, intentMethodName: intentMethod });
     this.logger.info("Handling intent '" + intentMethod + "' on state " + currentState.name);
 
     try {
       // Run beforeIntent-hooks as filter
-      const hookResults = await this.getBeforeIntentCallbacks().withArguments(currentState.instance, currentState.name, intentMethod, this, ...args).runAsFilter();
-
+      const hookResults = await this.getBeforeIntentCallbacks()
+        .withArguments(currentState.instance, currentState.name, intentMethod, this, ...args)
+        .runAsFilter();
       // Abort if not all hooks returned a "success" result
       if (!hookResults.success) {
         this.logger.info("One of your hooks did not return a successful result. Aborting planned state machine execution.");
@@ -37,11 +38,14 @@ export class StateMachine implements Transitionable {
       }
 
       // Check if there is a "beforeIntent_" method available
-      if (typeof(currentState.instance["beforeIntent_"]) === "function") {
+      // tslint:disable-next-line no-string-literal
+      if (typeof currentState.instance["beforeIntent_"] === "function") {
         const callbackResult = await Promise.resolve(((currentState.instance as any) as State.BeforeIntent).beforeIntent_(intentMethod, this, ...args));
 
         if (typeof callbackResult !== "boolean") {
-          throw new Error(`You have to return either true or false in your beforeIntent_ callback. Called beforeIntent_ for ${currentState.name}#${intentMethod}. `);
+          throw new Error(
+            `You have to return either true or false in your beforeIntent_ callback. Called beforeIntent_ for ${currentState.name}#${intentMethod}. `
+          );
         }
 
         if (!callbackResult) {
@@ -49,42 +53,42 @@ export class StateMachine implements Transitionable {
           return;
         }
       }
-
       // Check if intentMethod is available in currentState
-      if (typeof(currentState.instance[intentMethod]) === "function") {
+      if (typeof currentState.instance[intentMethod] === "function") {
         // Call given intent
         await Promise.resolve(currentState.instance[intentMethod](this, ...args));
 
         // Call afterIntent_ method if present
+        // tslint:disable-next-line no-string-literal
         if (typeof currentState.instance["afterIntent_"] === "function") {
           ((currentState.instance as any) as State.AfterIntent).afterIntent_(intentMethod, this, ...args);
         }
-
         // Run afterIntent hooks
-        await this.getAfterIntentCallbacks().withArguments(currentState.instance, currentState.name, intentMethod, this, ...args).runWithResultset();
+        await this.getAfterIntentCallbacks()
+          .withArguments(currentState.instance, currentState.name, intentMethod, this, ...args)
+          .runWithResultset();
       } else {
         // -> Intent does not exist on state class, so call unhandledGenericIntent instead
         await this.handleIntent(GenericIntent.Unhandled, intentMethod, ...args);
       }
-    } catch(e) {
+    } catch (e) {
       // Handle exception by error handler
       await this.handleOrReject(e, currentState.instance, currentState.name, intentMethod, ...args);
     }
   }
 
-  async transitionTo(state: string) {
-    if (this.stateNames.indexOf(state) === -1)
-      throw Error("Cannot transition to " + state + ": State does not exist!");
+  public async transitionTo(state: string) {
+    if (this.stateNames.indexOf(state) === -1) throw Error("Cannot transition to " + state + ": State does not exist!");
 
     return this.currentSessionFactory().set("__current_state", state);
   }
 
-  async redirectTo(state: string, intent: intent, ...args: any[]) {
+  public async redirectTo(state: string, intent: intent, ...args: any[]) {
     await this.transitionTo(state);
     return this.handleIntent(intent, ...args);
   }
 
-  stateExists(state: string) {
+  public stateExists(state: string) {
     return this.stateNames.indexOf(state) !== -1;
   }
 
@@ -92,7 +96,9 @@ export class StateMachine implements Transitionable {
 
   /** Checks if the current state is able to handle an error (=> if it has an 'errorFallback' method). If not, throws the error again.*/
   private async handleOrReject(error: Error, state: State.Required, stateName: string, intentMethod: string, ...args): Promise<void> {
+    // tslint:disable-next-line no-string-literal
     if (typeof state["errorFallback"] === "function") {
+      // tslint:disable-next-line no-string-literal
       await Promise.resolve(state["errorFallback"](error, state, stateName, intentMethod, this, ...args));
     } else {
       throw error;
@@ -101,9 +107,9 @@ export class StateMachine implements Transitionable {
 
   /** If you change this: Have a look at registering of states / automatic intent recognition, too! */
   private deriveIntentMethod(intent: intent): string {
-    if (typeof(intent) === "string" && intent.endsWith("Intent")) return intent;
+    if (typeof intent === "string" && intent.endsWith("Intent")) return intent;
 
-    let baseString = (typeof(intent) === "string" ? intent : GenericIntent[intent].toLowerCase() + "Generic") + "Intent";
+    const baseString = (typeof intent === "string" ? intent : GenericIntent[intent].toLowerCase() + "Generic") + "Intent";
     return baseString.charAt(0).toLowerCase() + baseString.slice(1);
   }
 
