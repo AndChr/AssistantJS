@@ -207,11 +207,25 @@ export class Generator implements CLIGeneratorExtension {
    * @param {PlatformGenerator.EntityMapping} parameterMapping that mapps all registered entities in an single object
    */
   private getEntity(param: string, parameterMapping: PlatformGenerator.EntityMapping): string {
-    if (typeof parameterMapping[param] === "undefined" && typeof this.configuration.entitySets[param] !== "undefined") {
+    const checkedParam = this.checkParam(param);
+    if (typeof parameterMapping[checkedParam] === "undefined" && typeof this.configuration.entitySets[checkedParam] !== "undefined") {
       // param is part of an entitySet
-      return `{${param}|${this.configuration.entitySets[param].mapsTo}}`;
+      return `{${checkedParam}|${this.configuration.entitySets[checkedParam].mapsTo}}`;
     }
-    return "{-|" + param + "}";
+    return "{-|" + checkedParam + "}";
+  }
+
+  /**
+   * Checks if the given entity-param has an entitySet mapping to it and if true, returns the name of the entitySet and otherwise returns the given entityName.
+   * @param {string} param that gets looked up in the configured entity sets.
+   * @returns {string} name of found entity set mapping or param, if nothing found.
+   */
+  private checkParam(param: string): string {
+    const entitiesMappedByEntitySets = Object.keys(this.configuration.entitySets).filter(key => this.configuration.entitySets[key].mapsTo === param);
+    if (entitiesMappedByEntitySets.length > 0) {
+      return entitiesMappedByEntitySets[0];
+    }
+    return param;
   }
 
   private mergeUtterances(target: { [intent: string]: string[] }, source: { [intent: string]: string[] }) {
