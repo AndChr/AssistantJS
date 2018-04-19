@@ -31,7 +31,7 @@ export class EntityDictionary implements EntityDictionaryInterface {
     if (typeof entityValue === "undefined") return undefined;
 
     // Try an exact match for performance reasons
-    const exactMatch = validValues.filter(validValue => validValue.toLowerCase() === entityValue.toLowerCase())[0];
+    const exactMatch = validValues.filter(validValue => validValue.toLowerCase().trimRight() === entityValue.toLowerCase())[0];
     if (typeof exactMatch !== "undefined") return exactMatch;
 
     // Do levenshtein
@@ -51,7 +51,7 @@ export class EntityDictionary implements EntityDictionaryInterface {
     if (typeof entityValue === "undefined") return undefined;
 
     return validValues.map(validValue => {
-      return { value: validValue, distance: levenshtein.get(validValue.toLowerCase(), entityValue.toLowerCase()) };
+      return { value: validValue, distance: levenshtein.get(validValue.toLowerCase().trimRight(), entityValue.toLowerCase()) };
     });
   }
 
