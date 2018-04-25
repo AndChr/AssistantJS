@@ -38,7 +38,7 @@ export class StateMachine implements Transitionable {
       }
 
       // Check if there is a "beforeIntent_" method available
-      // tslint:disable-next-line no-string-literal
+      // tslint:disable-next-line:no-string-literal
       if (typeof currentState.instance["beforeIntent_"] === "function") {
         const callbackResult = await Promise.resolve(((currentState.instance as any) as State.BeforeIntent).beforeIntent_(intentMethod, this, ...args));
 
